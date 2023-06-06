@@ -12,13 +12,11 @@
   + Gửi lệnh AT không nhận được response
   + Response cho ERROR quá nhiều
   + Bỏ cấu trúc event loop và thay bằng xQueue.
-- (`V1.1.5` -  Dự kiến) Lỗi disconnect - Hiện tại test chưa thấy nhưng thử bằng Hercules thì thấy đang connect dở thì bị disconnect
 
 ## Dự kiến
-- 29.5 -> 31.5: Hoàn thiện các feature (trừ restart ERROR quá nhiều và lỗi disconnect).
+- 29.5 -> 31.5: Hoàn thiện các feature
 -  1.6 ->  3.6: Phân tích gói bản tin nhận được từ SIM và triển khai bản tin gửi lên cloud (Innoway -  Dự kiến).
--  4.6: Hoàn thiện `V1.1.5`.
--  5.6 ->  6.6: Đẩy bản tin lên cloud, làm dashboard.
+-  4.6 ->  6.6: Đẩy bản tin lên cloud, làm dashboard.
 -  7.6 ->  9.6: Implement đo thực tế.
 
 ## Quá trình làm việc 

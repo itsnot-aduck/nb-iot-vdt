@@ -173,7 +173,7 @@ void nb_iot_getinfo(){
             //snr
             token = strtok(NULL, ",");
             strcpy(mqtt_message.snr,token);
-            sprintf(buffer,"{\\\"pci\\\":%s, \\\"cellId\\\": %d, \\\"rsrp\\\": %s, \\\"rsrq\\\": %s, ,\\\"snr\\\": %s}", mqtt_message.pci, mqtt_message.cell, mqtt_message.rsrp, mqtt_message.rsrq, mqtt_message.snr);
+            sprintf(buffer,"{\\\"pci\\\":%s, \\\"cellId\\\": %d, \\\"rsrp\\\": %s, \\\"rsrq\\\": %s, \\\"snr\\\": %s}", mqtt_message.pci, mqtt_message.cell, mqtt_message.rsrp, mqtt_message.rsrq, mqtt_message.snr);
             sprintf(message, "AT+CMQPUB=0,\"messages/%s/attributets\",1,0,0,%d,\"%s\"\r\n", deviceID, strlen(buffer)-10, buffer);
             ESP_LOGI(TAG, "Message: %s", message);
             break;
