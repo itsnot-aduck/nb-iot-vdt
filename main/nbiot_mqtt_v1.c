@@ -20,20 +20,43 @@
 
 //mqtt AT command
 const char* TAG = "SIM";
-const char AT[] = "AT\r\n";
+const char* deviceID = "4fc9fcfb-16f0-4d11-bb80-db55cfeda790";
 const char POWERDOWN[]="AT+CPOWD=1\r\n";
 const char MQTT_NEW[]="AT+CMQNEW=\"mqtt.innoway.vn\",\"1883\",12000,1024\r\n";
 const char MQTT_CONNECT[]="AT+CMQCON=0,3,\"VHT\",600,1,0,\"b07875e3-2175-42ee-a18c-a402d56082c5\",\"Y2z0as2KPG4TUkETFyQKFBlF0eVHmd2l\"\r\n";
-const char MQTT_PUBLISH[]="AT+CMQPUB=0,\"messages/831789eb-3431-4e29-8288-a2721c5d0d7b/attributets\",1,0,0,8,\"{\\\"st\\\":1}\"\r\n";
-const char MQTT_PUBLISH2[]="AT+CMQPUB=0,\"messages/831789eb-3431-4e29-8288-a2721c5d0d7b/attributets\",1,0,0,8,\"12345678\"\r\n";
 const char MQTT_DISCONNECT[]="AT+CMQDISCON=0\r\n";
-uint8_t count = 0;
-uint8_t count2 = 0;
-char req[255];
-uint8_t mqttFlag = 0;
-uint8_t resetFlag = 0;
+const char NB_GETINFO[] = "AT+CENG?\r\n";
+char message[255];
 
+uint8_t count = 0;
+typedef struct{
+    char pci[10];
+    char cellID[10];
+    int cell;
+    char rsrp[10];
+    char rsrq[10];
+    char snr[10];
+} info;
+info mqtt_message;
+
+char req[255];
+uint8_t resetFlag = 0;
 QueueHandle_t uartQueue;
+
+uint32_t hex2int(char *hex) {
+    uint32_t val = 0;
+    while (*hex) {
+        // get current character then increment
+        uint8_t byte = *hex++; 
+        // transform hex character to the 4bit equivalent number, using the ascii table indexes
+        if (byte >= '0' && byte <= '9') byte = byte - '0';
+        else if (byte >= 'a' && byte <='f') byte = byte - 'a' + 10;
+        else if (byte >= 'A' && byte <='F') byte = byte - 'A' + 10;    
+        // shift 4 to make space for new digit, and add the 4 bits of the new digit 
+        val = (val << 4) | (byte & 0xF);
+    }
+    return val;
+}
 
 static void Led_init(void){
 	gpio_config_t io_conf;
@@ -58,8 +81,8 @@ void nb_iot_mqtt_disconnect(){
 
 void nb_iot_mqtt_publish(){
     ESP_LOGI(TAG, "MQTT Publishing");
-    ESP_LOGI(TAG, "PUBLISH command: %s", MQTT_PUBLISH);
-    uart_put(MQTT_PUBLISH, (int)strlen(MQTT_PUBLISH));
+    ESP_LOGI(TAG, "PUBLISH command: %s", message);
+    uart_put(message, (int)strlen(message));
     vTaskDelay(1000/portTICK_PERIOD_MS);
     while(!resetFlag)
     {
@@ -73,7 +96,7 @@ void nb_iot_mqtt_publish(){
         else
         {
             ESP_LOGI(TAG, "Re-Publishing");
-            uart_put(MQTT_PUBLISH, (int)strlen(MQTT_PUBLISH));
+            uart_put(message, (int)strlen(message));
             vTaskDelay(1000/portTICK_PERIOD_MS);
         }
     }
@@ -100,6 +123,64 @@ void nb_iot_mqtt_connect(){
     }
 }
 
+void nb_iot_getinfo(){
+    char info[100];
+    char buffer[100];
+    char* token;
+    uart_put(NB_GETINFO, (int)strlen(NB_GETINFO));
+    while(!resetFlag){
+        if (xQueueReceive(uartQueue, req, 5000/portTICK_PERIOD_MS)==0)
+        {
+            resetFlag = 1;
+            ESP_LOGI(TAG, "UART receiving error detected!");
+            break;
+        }
+        else if (strstr(req, "NORMAL POWER DOWN"))
+        {
+            resetFlag = 1;
+            ESP_LOGI(TAG, "Module shutting down, restart!");
+            break;
+        }
+        else if (strstr(req, "ERROR"))
+        {
+            ESP_LOGI(TAG ,"Re-send GET INFO command");
+            uart_put(NB_GETINFO, (int)strlen(NB_GETINFO));
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+        }
+        else
+        {
+            strcpy(info, req);
+            //bỏ cụm +CENG
+            strtok(info, ":");
+            token = strtok(NULL,",");
+            //eafcn_offset
+            token = strtok(NULL, ",");
+            //pci
+            token = strtok(NULL, ",");
+            strcpy(mqtt_message.pci, token);
+            //cellID
+            token = strtok(NULL, "\"");
+            strcpy(mqtt_message.cellID, token);
+            mqtt_message.cell = hex2int(mqtt_message.cellID);
+            //rsrp
+            token = strtok(NULL, ",");
+            strcpy(mqtt_message.rsrp, token);
+            //rsrq
+            token = strtok(NULL, ",");
+            strcpy(mqtt_message.rsrq, token);
+            //rssi
+            token = strtok(NULL, ",");
+            //snr
+            token = strtok(NULL, ",");
+            strcpy(mqtt_message.snr,token);
+            sprintf(buffer,"{\\\"pci\\\":%s, \\\"cellId\\\": %d, \\\"rsrp\\\": %s, \\\"rsrq\\\": %s, ,\\\"snr\\\": %s}", mqtt_message.pci, mqtt_message.cell, mqtt_message.rsrp, mqtt_message.rsrq, mqtt_message.snr);
+            sprintf(message, "AT+CMQPUB=0,\"messages/%s/attributets\",1,0,0,%d,\"%s\"\r\n", deviceID, strlen(buffer)-10, buffer);
+            ESP_LOGI(TAG, "Message: %s", message);
+            break;
+        }
+    }
+}
+
 void nb_iot_mqtt_start(){
     resetFlag = 0;
     //Wake up the NB IoT
@@ -110,12 +191,15 @@ void nb_iot_mqtt_start(){
     while(uxQueueMessagesWaiting(uartQueue)){
         xQueueReceive(uartQueue, req, portMAX_DELAY);
     }
+    //Lấy dữ liệu về cell
+    ESP_LOGI(TAG, "Get data from device");
+    nb_iot_getinfo();
+    ESP_LOGI(TAG, "Get info done");
     //Start NB IoT
     ESP_LOGI(TAG, "MQTT Started");
     uart_put(MQTT_NEW, (int)strlen(MQTT_NEW));
     vTaskDelay(1000/portTICK_PERIOD_MS);
     while(!resetFlag){
-        //áp cho mọi trường hợp nhận - watchdog timer message
         if (xQueueReceive(uartQueue, req, 5000/portTICK_PERIOD_MS)==0)
         {
             resetFlag = 1;
@@ -181,7 +265,7 @@ void app_main(void)
     uart_set_callback(uart_handle);
     //chạy một lần trước hàm khởi động
     timer_handler();
-    TimerHandle_t timer = xTimerCreate("Timer", 60000/portTICK_PERIOD_MS, pdTRUE, (void*) 0, timer_handler);
+    TimerHandle_t timer = xTimerCreate("Timer", 300000/portTICK_PERIOD_MS, pdTRUE, (void*) 0, timer_handler);
     xTimerStart(timer, portMAX_DELAY);
     xTaskCreate(restart_check, "restart_check", 2048, NULL, 0, NULL);
 }

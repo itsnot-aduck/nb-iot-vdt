@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 char req[255] = "+CENG: 1769,0,57,\"0027E019\",-94,-14,-80,-3,3,\"A794\",1,,-83";
-// char req[255] = "+CENG: 1769,0,3,\"00285417\",-103,-24,-80,-13,3,\"A924\",0,,-92\n +CENG: 1769,0,4,-104";
 char buffer[255];
 char message[255];
 char* token;
@@ -15,6 +14,7 @@ typedef struct{
     int cell;
     char rsrp[10];
     char rsrq[10];
+    char snr[10];
 } info;
 info mqtt_message;
 
@@ -54,19 +54,21 @@ int main() {
     //cellID
     token = strtok(NULL, "\"");
     strcpy(mqtt_message.cellID, token);
-    printf("cellID: %s\n",mqtt_message.cellID);
     swap_ele(mqtt_message.cellID, 6,7);
     swap_ele(mqtt_message.cellID, 4,5);  
     mqtt_message.cell = hex2int(mqtt_message.cellID+5);
     //rsrp
     token = strtok(NULL, ",");
     strcpy(mqtt_message.rsrp, token);
-    printf("rsrp: %s\n", mqtt_message.rsrp);
     //rsrq
     token = strtok(NULL, ",");
     strcpy(mqtt_message.rsrq, token);
-    printf("rsrq: %s\n", mqtt_message.rsrq);
-    sprintf(message,"{\"pci\":%s, \"cellId\": %d, \"rsrp\": %s, \"rsrq\": %s}", mqtt_message.pci, mqtt_message.cell, mqtt_message.rsrp, mqtt_message.rsrq);
+    //rssi
+    token = strtok(NULL, ",");
+    //snr
+    token = strtok(NULL, ",");
+    strcpy(mqtt_message.snr,token);
+    sprintf(message,"{\"pci\":%s, \"cellId\": %d, \"rsrp\": %s, \"rsrq\": %s, \"snr\": %s}", mqtt_message.pci, mqtt_message.cell, mqtt_message.rsrp, mqtt_message.rsrq, mqtt_message.snr);
     sprintf(buffer, "AT+CMQPUB=0,\"messages/%s/attributets\",1,0,0,%d,\"%s\"\r\n", deviceID, strlen(message), message);
     printf("%s", buffer);
     return 0;
