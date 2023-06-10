@@ -19,5 +19,3 @@
 -  4.6 ->  6.6: Đẩy bản tin lên cloud, làm dashboard.
 -  7.6 ->  9.6: Implement đo thực tế.
 
-## Quá trình làm việc 
-
